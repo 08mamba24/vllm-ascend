@@ -32,14 +32,9 @@ class NPUModelRunner310(NPUModelRunner):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._acl_format = ACL_FORMAT_FRACTAL_NZ
-        self._kv_cache_debug = os.getenv("VLLM_ASCEND_DEBUG_KV_CACHE", "0") == "1"
         # For MLA on 310P, ND format is safer for memory footprint; NZ may
         # inflate allocations due to padding/alignment.
         self._mla_kv_cache_format = os.getenv("VLLM_ASCEND_310P_MLA_KV_CACHE_FORMAT", "ND").upper()
-
-    @staticmethod
-    def _bytes_to_gib(num_bytes: int) -> float:
-        return float(num_bytes) / (1024**3)
 
     def initialize_kv_cache_tensors(self, kv_cache_config: KVCacheConfig) -> dict[str, torch.Tensor]:
         """
@@ -105,20 +100,6 @@ class NPUModelRunner310(NPUModelRunner):
                             int(kv_cache_tensor.size // k_tensor_split_factor),
                             int(kv_cache_tensor.size // v_tensor_split_factor),
                         )
-                        if self._kv_cache_debug:
-                            logger.info(
-                                "[310P KV][size] layer=%s total_bytes=%d kv_lora_rank=%d qk_rope_head_dim=%d "
-                                "split_bytes=(k:%d,v:%d) shared_by_len=%d first_shared=%s last_shared=%s",
-                                layer_name,
-                                kv_cache_tensor.size,
-                                self.model_config.hf_text_config.kv_lora_rank,
-                                self.model_config.hf_text_config.qk_rope_head_dim,
-                                kv_tensor_size[0],
-                                kv_tensor_size[1],
-                                len(kv_cache_tensor.shared_by),
-                                kv_cache_tensor.shared_by[0] if len(kv_cache_tensor.shared_by) > 0 else "NA",
-                                kv_cache_tensor.shared_by[-1] if len(kv_cache_tensor.shared_by) > 0 else "NA",
-                            )
                     else:
                         kv_tensor_split_factor = 2
                         kv_tensor_size = int(kv_cache_tensor.size // kv_tensor_split_factor)
@@ -205,30 +186,6 @@ class NPUModelRunner310(NPUModelRunner):
                     else:
                         k_shape = kv_cache_shape[1:]
                         v_shape = k_shape
-
-                    k_bytes_est = int(torch.tensor(k_shape).prod().item()) * torch.tensor([], dtype=dtype).element_size()
-                    v_bytes_est = int(torch.tensor(v_shape).prod().item()) * torch.tensor([], dtype=dtype).element_size()
-                    if self._kv_cache_debug:
-                        logger.info(
-                            "[310P KV][alloc] layer=%s num_blocks=%d block_size=%d kv_heads=%d "
-                            "k_shape=%s v_shape=%s dtype=%s est_gib=(k:%.3f,v:%.3f,total:%.3f) "
-                            "sum_page_bytes=%d page_size_bytes=%d cfg_num_blocks=%d mla=%s fmt=%s",
-                            layer_name,
-                            num_blocks,
-                            kv_cache_spec.block_size,
-                            kv_cache_spec.num_kv_heads,
-                            tuple(k_shape),
-                            tuple(v_shape),
-                            str(dtype),
-                            self._bytes_to_gib(k_bytes_est),
-                            self._bytes_to_gib(v_bytes_est),
-                            self._bytes_to_gib(k_bytes_est + v_bytes_est),
-                            sum_page_size_bytes,
-                            kv_cache_spec.page_size_bytes,
-                            kv_cache_config.num_blocks,
-                            self.model_config.use_mla,
-                            self._mla_kv_cache_format if self.model_config.use_mla else "NZ",
-                        )
 
                     if self.model_config.use_mla and self._mla_kv_cache_format == "ND":
                         k_cache = torch.empty(size=k_shape, dtype=dtype, device=self.device)
