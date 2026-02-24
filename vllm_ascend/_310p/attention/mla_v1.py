@@ -479,9 +479,6 @@ class AscendMLAImpl310(MLAAttentionImpl):
         if self.kv_a_layernorm is not None:
             kv_c = self.kv_a_layernorm(kv_c)
 
-        kv_nope = self.kv_b_proj(kv_c)[0].view(bsz, self.num_kv_heads, -1)
-        k_nope = kv_nope[..., : self.qk_nope_head_dim]
-        v = kv_nope[..., self.qk_nope_head_dim : self.qk_nope_head_dim + self.v_head_dim]
         k_pe = self._rope_single(k_pe, cos, sin)
 
         self._store_to_cache_310(kv_cache, kv_c, k_pe, slots)
@@ -489,9 +486,6 @@ class AscendMLAImpl310(MLAAttentionImpl):
         return {
             "ql_nope": ql_nope,
             "q_pe": q_pe,
-            "k_nope": k_nope,
-            "k_pe": k_pe,
-            "v": v,
         }
 
     def _mla_preprocess_prefill(
