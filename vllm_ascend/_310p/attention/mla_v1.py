@@ -119,7 +119,7 @@ class AscendMLAMetadataBuilder310(MLACommonMetadataBuilder[AscendMLAMetadata310]
 
     @classmethod
     def get_cudagraph_support(
-        cls: type[AscendMLAMetadataBuilder310],
+        cls: type["AscendMLAMetadataBuilder310"],
         vllm_config: VllmConfig,
         kv_cache_spec: AttentionSpec,
     ) -> AttentionCGSupport:
@@ -142,11 +142,9 @@ class AscendMLAMetadataBuilder310(MLACommonMetadataBuilder[AscendMLAMetadata310]
         query_start_loc = common_attn_metadata.query_start_loc
         query_start_loc_cpu = common_attn_metadata.query_start_loc_cpu
 
-        self.num_decodes, self.num_prefills, self.num_decode_tokens, self.num_prefill_tokens = (
-            split_decodes_and_prefills(
-                common_attn_metadata,
-                decode_threshold=self.decode_threshold,
-            )
+        self.num_decodes, self.num_prefills, self.num_decode_tokens, self.num_prefill_tokens = split_decodes_and_prefills(
+            common_attn_metadata,
+            decode_threshold=self.decode_threshold,
         )
         self.set_num_actual_tokens(common_attn_metadata)
 
@@ -265,7 +263,7 @@ class AscendMLABackend310(AttentionBackend):
         return (num_blocks, block_size, num_kv_heads, head_size)
 
     @staticmethod
-    def get_impl_cls() -> type[MLAAttentionImpl]:
+    def get_impl_cls() -> type["MLAAttentionImpl"]:
         return AscendMLAImpl310
 
     @staticmethod
@@ -705,14 +703,14 @@ class AscendMLAImpl310(MLAAttentionImpl):
             k_i = k_nope_h[offset : offset + cur_len]
             v_i = v_h[offset : offset + cur_len]
 
-            scores = torch.einsum("thd,shd->tsh", q_i, k_i) * self.scale
+            scores = torch.einsum("thd,shd->ths", q_i, k_i) * self.scale
             causal = torch.triu(
                 torch.ones(cur_len, cur_len, dtype=torch.bool, device=q_nope.device),
                 diagonal=1,
             )
             scores.masked_fill_(causal.unsqueeze(1), float("-inf"))
             probs = torch.softmax(scores, dim=-1)
-            out[offset : offset + cur_len] = torch.einsum("tsh,shd->thd", probs, v_i)
+            out[offset : offset + cur_len] = torch.einsum("ths,shd->thd", probs, v_i)
             offset += cur_len
         return out
 
