@@ -417,6 +417,21 @@ class EagleProposer(VllmEagleProposer):
         self.input_ids[last_token_indices] = next_token_ids
         if self.use_cuda_graph and num_tokens <= self.runner.cudagraph_batch_sizes[-1]:
             num_input_tokens = self.runner.cudagraph_dispatcher._bs_to_padded_graph_size[num_tokens]
+            if not (
+                self.speculative_config.disable_padded_drafter_batch
+                and self.compilation_config.cudagraph_mode == CUDAGraphMode.PIECEWISE
+            ):
+                # TODO: Due to the inconsistency between the proposer `dispatcher` and model runner, this padding
+                # should have been done in model runner but not. For example, at prefill stage, target model
+                # is run in eager mode currently, which means `_pad_query_start_loc_for_fia` is not called,
+                # while draft model is run in graph model, which means we should pad the `query_start_loc`.
+                # Need to be fixed in the future.
+                num_reqs_padded = self.runner._pad_query_start_loc_for_fia(
+                    num_input_tokens, common_attn_metadata.num_reqs, common_attn_metadata.num_reqs
+                )
+                common_attn_metadata.num_reqs = num_reqs_padded
+                common_attn_metadata.query_start_loc = self.runner.query_start_loc.gpu[: num_reqs_padded + 1]
+                common_attn_metadata.query_start_loc_cpu = self.runner.query_start_loc.cpu[: num_reqs_padded + 1]
         else:
             num_input_tokens = num_tokens
 
@@ -1156,7 +1171,7 @@ class EagleProposer(VllmEagleProposer):
                 positions = positions.squeeze(-1)
         else:
             forward_context = get_forward_context()
-            if forward_context.sp_enabled:
+            if forward_context.flash_comm_v1_enabled:
                 hidden_states = split_inputs_tp_to_sp(hidden_states, hidden_states)
         return hidden_states, positions
 
@@ -1176,7 +1191,7 @@ class EagleProposer(VllmEagleProposer):
                     hidden_states = last_hidden_states
         else:
             forward_context = get_forward_context()
-            if forward_context.sp_enabled:
+            if forward_context.flash_comm_v1_enabled:
                 last_hidden_states = torch.ops.vllm.maybe_all_gather_and_maybe_unpad(
                     last_hidden_states.contiguous(), True
                 )
