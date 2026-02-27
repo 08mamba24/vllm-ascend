@@ -60,6 +60,9 @@ NDArray = "NDArray"
 EOFError = "EOFError"
 
 [type.py.extend-words]
+ths = "ths"
+thd = "thd"
+shd = "shd"
 
 [type.cpp]
 extend-glob = []

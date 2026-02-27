@@ -634,6 +634,7 @@ def register_ascend_customop(vllm_config: VllmConfig | None = None):
     if is_310p():
         from vllm_ascend._310p.fused_moe.fused_moe import AscendFusedMoE310, AscendSharedFusedMoE310
         from vllm_ascend._310p.ops.activation import AscendSiluAndMul310
+        from vllm_ascend._310p.ops.deepseek_scaling_rope import AscendDeepseekScalingRotaryEmbedding310
         from vllm_ascend._310p.ops.layernorm import AscendGemmaRMSNorm310, AscendRMSNorm310
         from vllm_ascend._310p.ops.rotary_embedding import AscendRotaryEmbedding310
 
@@ -645,6 +646,7 @@ def register_ascend_customop(vllm_config: VllmConfig | None = None):
                 "GemmaRMSNorm": AscendGemmaRMSNorm310,
                 "FusedMoE": AscendFusedMoE310,
                 "SharedFusedMoE": AscendSharedFusedMoE310,
+                "DeepseekScalingRotaryEmbedding": AscendDeepseekScalingRotaryEmbedding310,
             }
         )
 

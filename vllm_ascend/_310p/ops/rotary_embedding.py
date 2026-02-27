@@ -19,7 +19,36 @@
 import torch
 import torch_npu
 
-from vllm_ascend.ops.rotary_embedding import AscendRotaryEmbedding, get_cos_and_sin_slice
+from vllm_ascend.ops.rotary_embedding import (
+    AscendRotaryEmbedding,
+    _cos_cache,
+    _sin_cache,
+    _cos_sin_cache,
+    get_cos_and_sin_slice,
+)
+
+
+def _record_cos_and_sin_cache_310p(cos_sin_cache: torch.Tensor) -> None:
+    """
+    310P-specific cache recording that correctly splits cos_sin_cache.
+    
+    vLLM's RotaryEmbedding produces cos_sin_cache as [L, 2*D] where:
+    - First D elements are cos values
+    - Last D elements are sin values
+    
+    This function correctly extracts [L, D] for each, which is what
+    MLA's get_cos_and_sin_mla expects.
+    """
+    global _cos_cache, _sin_cache
+    if _cos_cache is not None or _sin_cache is not None:
+        return
+    
+    # cos_sin_cache is [L, 2*D] where first D are cos, last D are sin
+    hidden_dim = cos_sin_cache.shape[-1] // 2
+    # Simple split: first half is cos, second half is sin
+    # This produces [L, D] for each, matching MLA's expectation
+    _cos_cache = cos_sin_cache[:, :hidden_dim].contiguous()
+    _sin_cache = cos_sin_cache[:, hidden_dim:].contiguous()
 
 
 def _rope_forward_oot(
@@ -85,6 +114,36 @@ def _rope_forward_oot(
 
 
 class AscendRotaryEmbedding310(AscendRotaryEmbedding):
+    """
+    310P-specific RotaryEmbedding that uses correct cache format for MLA.
+    
+    The key difference from the base AscendRotaryEmbedding is that we use
+    _record_cos_and_sin_cache_310p which correctly splits cos_sin_cache
+    into [L, D] format instead of the erroneous [L, 2*D] format.
+    """
+    
+    def __init__(
+        self,
+        head_size: int,
+        rotary_dim: int,
+        max_position_embeddings: int,
+        base: float,
+        is_neox_style: bool,
+        dtype: torch.dtype,
+    ) -> None:
+        # Call parent __init__ but skip its cache recording
+        # by calling grandparent's __init__ directly
+        from vllm.model_executor.layers.rotary_embedding import RotaryEmbedding
+        RotaryEmbedding.__init__(
+            self, head_size, rotary_dim, max_position_embeddings, base, is_neox_style, dtype
+        )
+        # Record the raw cos_sin_cache for use by non-MLA paths
+        global _cos_sin_cache
+        if _cos_sin_cache is None:
+            _cos_sin_cache = self.cos_sin_cache
+        # Use 310P-specific cache recording that produces correct [L, D] format
+        _record_cos_and_sin_cache_310p(self.cos_sin_cache)
+
     def forward_oot(
         self,
         positions: torch.Tensor,
