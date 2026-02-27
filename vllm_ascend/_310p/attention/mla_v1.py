@@ -111,7 +111,10 @@ class AscendMLAMetadataBuilder310(MLACommonMetadataBuilder[AscendMLAMetadata310]
         self.graph_pad_size = 0
         self.query_lens: torch.Tensor = None
         self.seq_lens: torch.Tensor = None
-        self.attn_mask_builder = AttentionMaskBuilder310(self.device)
+
+        # Initialize 310P-specific attention mask builder
+        max_model_len = vllm_config.model_config.max_model_len
+        self.attn_mask_builder = AttentionMaskBuilder310(self.device, max_model_len)
 
     @staticmethod
     def determine_chunked_prefill_workspace_size(vllm_config: VllmConfig) -> int:
