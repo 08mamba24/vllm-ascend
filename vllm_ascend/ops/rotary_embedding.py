@@ -64,8 +64,13 @@ def set_cos_and_sin(vllm_config, max_num_reqs, decode_token_per_req, dtype, devi
     global _sin
 
     from vllm.logger import logger
-    logger.info("[RoPE Cache] set_cos_and_sin called: use_mla=%s, dtype=%s, device=%s",
-                vllm_config.model_config.use_mla, dtype, device)
+
+    logger.info(
+        "[RoPE Cache] set_cos_and_sin called: use_mla=%s, dtype=%s, device=%s",
+        vllm_config.model_config.use_mla,
+        dtype,
+        device,
+    )
 
     if _cos_mla is not None or _sin_mla is not None or _cos is not None or _sin is not None:
         logger.info("[RoPE Cache] Cache already initialized, skipping")
@@ -83,8 +88,11 @@ def set_cos_and_sin(vllm_config, max_num_reqs, decode_token_per_req, dtype, devi
         # with proper [L, D] shape format from _record_cos_and_sin_cache_interleaved()
         _cos_cache = torch.ones(max_num_batched_tokens, rope_dim, dtype=dtype, device=device)
         _sin_cache = torch.zeros(max_num_batched_tokens, rope_dim, dtype=dtype, device=device)
-        logger.info("[RoPE Cache] MLA cache initialized: max_num_batched_tokens=%d, rope_dim=%d",
-                    max_num_batched_tokens, rope_dim)
+        logger.info(
+            "[RoPE Cache] MLA cache initialized: max_num_batched_tokens=%d, rope_dim=%d",
+            max_num_batched_tokens,
+            rope_dim,
+        )
     elif not is_vl_model(vllm_config) and has_rope(vllm_config):
         rope_dim = model_config.get_head_size()
         # For models using partial rope like Qwen3-Next.
@@ -94,20 +102,28 @@ def set_cos_and_sin(vllm_config, max_num_reqs, decode_token_per_req, dtype, devi
             rope_dim = int(model_config.hf_text_config.rotary_dim)
         _cos = torch.ones(1, max_num_batched_tokens, 1, rope_dim, dtype=dtype, device=device)
         _sin = torch.zeros(1, max_num_batched_tokens, 1, rope_dim, dtype=dtype, device=device)
-        logger.info("[RoPE Cache] Non-MLA cache initialized: max_num_batched_tokens=%d, rope_dim=%d",
-                    max_num_batched_tokens, rope_dim)
+        logger.info(
+            "[RoPE Cache] Non-MLA cache initialized: max_num_batched_tokens=%d, rope_dim=%d",
+            max_num_batched_tokens,
+            rope_dim,
+        )
 
 
 def get_cos_and_sin_mla(positions, use_cache=False):
     global _cos_cache, _sin_cache, _cos_mla, _sin_mla
     from vllm.logger import logger
-    logger.info("[RoPE Cache] get_cos_and_sin_mla called: _cos_cache is None=%s, positions shape=%s",
-                _cos_cache is None, positions.shape if positions is not None else None)
-    
+
+    logger.info(
+        "[RoPE Cache] get_cos_and_sin_mla called: _cos_cache is None=%s, positions shape=%s",
+        _cos_cache is None,
+        positions.shape if positions is not None else None,
+    )
+
     # Lazy initialization for multi-process worker
     # When worker process is forked, global variables are not shared
     if _cos_cache is None:
         from vllm.config import get_current_vllm_config
+
         vllm_config = get_current_vllm_config()
         if vllm_config is not None:
             logger.info("[RoPE Cache] Lazy initialization in worker process")
@@ -121,14 +137,19 @@ def get_cos_and_sin_mla(positions, use_cache=False):
                 _sin_mla = torch.zeros(max_num_batched_tokens, 1, 1, rope_dim, dtype=dtype, device=device)
                 _cos_cache = torch.ones(max_num_batched_tokens, rope_dim, dtype=dtype, device=device)
                 _sin_cache = torch.zeros(max_num_batched_tokens, rope_dim, dtype=dtype, device=device)
-                logger.info("[RoPE Cache] Lazy init completed: max_num_batched_tokens=%d, rope_dim=%d",
-                            max_num_batched_tokens, rope_dim)
+                logger.info(
+                    "[RoPE Cache] Lazy init completed: max_num_batched_tokens=%d, rope_dim=%d",
+                    max_num_batched_tokens,
+                    rope_dim,
+                )
             else:
                 raise RuntimeError("[RoPE Cache] Model is not MLA, but get_cos_and_sin_mla() was called")
         else:
-            raise RuntimeError("[RoPE Cache] _cos_cache is None! set_cos_and_sin() was not called in this process. "
-                              "This is likely a multi-process issue where globals are not shared across processes.")
-    
+            raise RuntimeError(
+                "[RoPE Cache] _cos_cache is None! set_cos_and_sin() was not called in this process. "
+                "This is likely a multi-process issue where globals are not shared across processes."
+            )
+
     cos = _cos_cache[positions].unsqueeze(1).unsqueeze(2)
     sin = _sin_cache[positions].unsqueeze(1).unsqueeze(2)
     if not use_cache:

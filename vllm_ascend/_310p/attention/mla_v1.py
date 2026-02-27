@@ -671,14 +671,11 @@ class AscendMLAImpl310(MLAAttentionImpl):
             cos = cos.squeeze(1)
             sin = sin.squeeze(1)
         elif cos.dim() != 2 or sin.dim() != 2:
-            raise RuntimeError(
-                f"Unsupported RoPE cache rank in {source}: cos.dim={cos.dim()}, sin.dim={sin.dim()}"
-            )
+            raise RuntimeError(f"Unsupported RoPE cache rank in {source}: cos.dim={cos.dim()}, sin.dim={sin.dim()}")
 
         if cos.shape != sin.shape:
             raise RuntimeError(
-                f"Mismatched RoPE cos/sin shape in {source}: "
-                f"cos={tuple(cos.shape)}, sin={tuple(sin.shape)}"
+                f"Mismatched RoPE cos/sin shape in {source}: cos={tuple(cos.shape)}, sin={tuple(sin.shape)}"
             )
 
         if cos.shape[0] < num_tokens:
@@ -709,13 +706,11 @@ class AscendMLAImpl310(MLAAttentionImpl):
             raise RuntimeError(f"RoPE head dim must be even, got D={D}")
         if cos.dim() != 2 or sin.dim() != 2:
             raise RuntimeError(
-                f"_rope_single expects cos/sin as [T, C], "
-                f"got cos={tuple(cos.shape)}, sin={tuple(sin.shape)}"
+                f"_rope_single expects cos/sin as [T, C], got cos={tuple(cos.shape)}, sin={tuple(sin.shape)}"
             )
         if cos.shape != sin.shape:
             raise RuntimeError(
-                f"Mismatched RoPE cos/sin in _rope_single: "
-                f"cos={tuple(cos.shape)}, sin={tuple(sin.shape)}"
+                f"Mismatched RoPE cos/sin in _rope_single: cos={tuple(cos.shape)}, sin={tuple(sin.shape)}"
             )
         if cos.shape[0] != B:
             raise RuntimeError(f"RoPE token mismatch in _rope_single: x={B}, cos={cos.shape[0]}, sin={sin.shape[0]}")

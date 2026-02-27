@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2025 Huawei Technologies Co., Ltd. All Rights Reserved.
+# Copyright (c) 2026 Huawei Technologies Co., Ltd. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,15 +16,11 @@
 #
 
 import math
-import os
 
 import torch
-import torch_npu
 from vllm.logger import logger
-from vllm_ascend._310p.ops.rotary_embedding import (
-    _record_cos_and_sin_cache_310p,
-    _rope_forward_oot,
-)
+
+from vllm_ascend._310p.ops.rotary_embedding import _rope_forward_oot
 from vllm_ascend.ops.rotary_embedding import AscendDeepseekScalingRotaryEmbedding
 
 
