@@ -23,8 +23,8 @@ from vllm_ascend.ops.rotary_embedding import (
     AscendRotaryEmbedding,
     _cos_cache,
     _cos_sin_cache,
-    get_cos_and_sin_slice,
     _sin_cache,
+    get_cos_and_sin_slice,
 )
 
 
